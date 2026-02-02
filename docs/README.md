@@ -1,152 +1,204 @@
-# Ostium One-Click Trading Component
+# @cradle/erc20-stylus
 
-Pre-built component for enabling one-click trading on Ostium DEX.
+ERC-20 Token implementation and interaction utilities for Arbitrum Stylus.
 
-## Overview
+## Features
 
-This component provides React hooks and utilities for:
-
-1. **Delegation Setup**: Enable gasless transactions by delegating signature authority
-2. **USDC Approval**: Pre-approve USDC spending for the Ostium storage contract
-3. **Network Support**: Works on Arbitrum mainnet and Sepolia testnet
+- **Ownable** - Owner-controlled contract management
+- **Mintable** - Owner can mint new tokens
+- **Burnable** - Token holders can burn their tokens
+- **Pausable** - Owner can pause/unpause transfers
+- Complete ERC-20 standard implementation
+- React hooks for easy frontend integration
 
 ## Installation
 
-This package is included in your generated project. No additional installation required.
+```bash
+pnpm add @cradle/erc20-stylus
+```
 
-## Usage
+## Smart Contract
 
-### Basic Usage with Hooks
+The smart contract source code is located in the `contract/` directory. This is a Rust-based Stylus contract that can be deployed to Arbitrum.
+
+### Prerequisites
+
+1. Install Rust and Cargo:
+   ```bash
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   ```
+
+2. Install cargo-stylus:
+   ```bash
+   cargo install cargo-stylus
+   ```
+
+3. Add the WASM target:
+   ```bash
+   rustup target add wasm32-unknown-unknown
+   ```
+
+### Building the Contract
+
+```bash
+cd contract
+
+# Check the contract compiles correctly
+cargo stylus check
+
+# Build for deployment
+cargo build --release --target wasm32-unknown-unknown
+```
+
+### Deploying to Arbitrum
+
+#### Arbitrum Sepolia (Testnet)
+
+```bash
+cd contract
+cargo stylus deploy \
+  --private-key <YOUR_PRIVATE_KEY> \
+  --endpoint https://sepolia-rollup.arbitrum.io/rpc
+```
+
+#### Arbitrum One (Mainnet)
+
+```bash
+cd contract
+cargo stylus deploy \
+  --private-key <YOUR_PRIVATE_KEY> \
+  --endpoint https://arb1.arbitrum.io/rpc
+```
+
+### Initializing the Contract
+
+After deployment, call the `initialize` function with your token parameters:
+
+```rust
+// Function signature:
+initialize(
+    name: String,        // Token name (e.g., "My Token")
+    symbol: String,      // Token symbol (e.g., "MTK")
+    decimals: u8,        // Decimal places (typically 18)
+    initial_supply: U256,// Initial supply (in smallest units)
+    owner: Address       // Owner address
+)
+```
+
+### Contract Functions
+
+#### ERC-20 Standard
+- `name()` - Returns the token name
+- `symbol()` - Returns the token symbol
+- `decimals()` - Returns the number of decimals
+- `total_supply()` - Returns the total token supply
+- `balance_of(account)` - Returns the balance of an account
+- `transfer(to, value)` - Transfer tokens
+- `approve(spender, value)` - Approve a spender
+- `allowance(owner, spender)` - Get allowance
+- `transfer_from(from, to, value)` - Transfer using allowance
+
+#### Extended Functions
+- `increase_allowance(spender, added_value)` - Increase allowance
+- `decrease_allowance(spender, subtracted_value)` - Decrease allowance
+
+#### Mintable (Owner Only)
+- `mint(to, amount)` - Mint new tokens
+
+#### Burnable
+- `burn(amount)` - Burn caller's tokens
+- `burn_from(from, amount)` - Burn tokens using allowance
+
+#### Pausable (Owner Only)
+- `pause()` - Pause transfers
+- `unpause()` - Unpause transfers
+- `is_paused()` - Check if paused
+
+#### Ownable
+- `owner()` - Get current owner
+- `transfer_ownership(new_owner)` - Transfer ownership
+- `renounce_ownership()` - Renounce ownership
+
+## Frontend Usage
+
+### Using React Hooks
 
 ```tsx
-import { useDelegation, useUsdcApproval, CONTRACTS, CHAIN_IDS } from '@cradle/ostium-onect';
-import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
+import { useERC20Interactions, CHAIN_IDS } from '@cradle/erc20-stylus';
 
-function TradingSetup() {
-  const network = 'arbitrum'; // or 'arbitrum-sepolia'
-  const { address } = useAccount();
-  const publicClient = usePublicClient({ chainId: CHAIN_IDS[network] });
-  const { data: walletClient } = useWalletClient({ chainId: CHAIN_IDS[network] });
-
-  const delegation = useDelegation({
-    publicClient: publicClient!,
-    walletClient: walletClient ?? undefined,
-    network,
-    userAddress: address,
-    delegateAddress: '0x...', // Your delegate address
-  });
-
-  const approval = useUsdcApproval({
-    publicClient: publicClient!,
-    walletClient: walletClient ?? undefined,
-    network,
-    userAddress: address,
+function TokenDashboard() {
+  const token = useERC20Interactions({
+    contractAddress: '0x...', // Your deployed contract address
+    rpcEndpoint: 'https://sepolia-rollup.arbitrum.io/rpc',
+    privateKey: process.env.PRIVATE_KEY,
   });
 
   return (
     <div>
-      <button onClick={() => delegation.enable()}>
-        Enable Delegation
-      </button>
-      <button onClick={() => approval.approve()}>
-        Approve USDC
+      <p>Name: {token.name}</p>
+      <p>Symbol: {token.symbol}</p>
+      <p>Total Supply: {token.totalSupply}</p>
+      <button onClick={() => token.transfer('0x...', '100')}>
+        Transfer 100 tokens
       </button>
     </div>
   );
 }
 ```
 
-### Using Core Functions Directly
+### Using Interaction Functions Directly
 
 ```tsx
-import { 
-  checkDelegationStatus, 
-  enableDelegation,
-  checkApprovalStatus,
-  approveUsdc,
-  CONTRACTS 
-} from '@cradle/ostium-onect';
+import { getTokenInfo, transfer, mint } from '@cradle/erc20-stylus';
 
-// Check if delegation is active
-const status = await checkDelegationStatus(publicClient, network, userAddress);
+// Get token information
+const info = await getTokenInfo({
+  contractAddress: '0x...',
+  rpcEndpoint: 'https://sepolia-rollup.arbitrum.io/rpc',
+});
 
-// Enable delegation
-const hash = await enableDelegation(walletClient, network, delegateAddress);
+console.log(info.name, info.symbol, info.totalSupply);
 
-// Check USDC approval
-const approval = await checkApprovalStatus(publicClient, network, userAddress);
-
-// Approve USDC spending
-const approvalHash = await approveUsdc(walletClient, network, '1000000');
+// Transfer tokens
+await transfer({
+  contractAddress: '0x...',
+  rpcEndpoint: 'https://sepolia-rollup.arbitrum.io/rpc',
+  privateKey: '0x...',
+  to: '0x...',
+  amount: '1000000000000000000', // 1 token (with 18 decimals)
+});
 ```
-
-## Contract Addresses
-
-### Arbitrum Mainnet
-
-| Contract | Address |
-|----------|---------|
-| Trading | `0x...` (see constants.ts) |
-| Storage | `0x...` (see constants.ts) |
-| USDC | `0x...` (see constants.ts) |
-
-### Arbitrum Sepolia (Testnet)
-
-| Contract | Address |
-|----------|---------|
-| Trading | `0x...` (see constants.ts) |
-| Storage | `0x...` (see constants.ts) |
-| USDC | `0x...` (see constants.ts) |
 
 ## API Reference
 
+### Constants
+
+- `ERC20_ABI` - Full ABI for ERC20 Stylus contract
+- `CHAIN_IDS` - Chain IDs for supported networks
+- `RPC_ENDPOINTS` - Default RPC endpoints
+- `FACTORY_ADDRESSES` - Factory contract addresses
+
 ### Hooks
 
-#### `useDelegation(options)`
+- `useERC20Deploy` - Hook for deploying new ERC20 tokens
+- `useERC20Interactions` - Hook for interacting with deployed tokens
 
-Manages delegation status and enabling.
+### Functions
 
-**Options:**
-- `publicClient` - Viem public client
-- `walletClient` - Viem wallet client (optional)
-- `network` - 'arbitrum' | 'arbitrum-sepolia'
-- `userAddress` - User's wallet address
-- `delegateAddress` - Address to delegate to
+- `deployERC20TokenViaAPI` - Deploy a new ERC20 token via API
+- `initializeToken` - Initialize a deployed token
+- `getTokenInfo` - Get token information
+- `getBalance` - Get token balance
+- `getAllowance` - Get allowance
+- `transfer` - Transfer tokens
+- `approve` - Approve spender
+- `transferFrom` - Transfer using allowance
+- `mint` - Mint new tokens (owner only)
+- `burn` - Burn tokens
+- `pause` - Pause transfers (owner only)
+- `unpause` - Unpause transfers (owner only)
+- `transferOwnership` - Transfer contract ownership
 
-**Returns:**
-- `status` - Current delegation status
-- `isLoading` - Loading state
-- `error` - Error message
-- `enable()` - Function to enable delegation
-- `refetch()` - Function to refresh status
+## License
 
-#### `useUsdcApproval(options)`
-
-Manages USDC approval status and approving.
-
-**Options:**
-- `publicClient` - Viem public client
-- `walletClient` - Viem wallet client (optional)
-- `network` - 'arbitrum' | 'arbitrum-sepolia'
-- `userAddress` - User's wallet address
-
-**Returns:**
-- `status` - Current approval status
-- `isLoading` - Loading state
-- `error` - Error message
-- `approve(amount?)` - Function to approve USDC
-- `refetch()` - Function to refresh status
-
-## Files
-
-- `src/index.ts` - Main exports
-- `src/delegation.ts` - Delegation logic
-- `src/approval.ts` - USDC approval logic
-- `src/constants.ts` - Contract addresses and ABIs
-- `src/types.ts` - TypeScript types
-- `src/hooks/` - React hooks
-- `src/example.tsx` - Example usage component
-
----
-
-Generated with ❤️ by [Cradle](https://cradle-web-eight.vercel.app)
+MIT OR Apache-2.0

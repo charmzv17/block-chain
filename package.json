@@ -8,9 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "wallet:setup": "echo \"Get your WalletConnect Project ID from https://dashboard.reown.com\"",
-    "maxxit:setup": "echo \"See packages/maxxit-lazy-trader/README.md for setup instructions\"",
-    "ostium:setup": "echo \"See packages/ostium-onect/README.md for setup instructions\""
+    "deploy:token": "ts-node scripts/deploy-erc20.ts",
+    "token:info": "ts-node scripts/token-info.ts"
   },
   "dependencies": {},
   "devDependencies": {

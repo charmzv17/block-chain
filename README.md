@@ -1,96 +1,204 @@
-# My Dapp
+# @cradle/erc20-stylus
 
-A Web3 application - foundation built with Cradle
+ERC-20 Token implementation and interaction utilities for Arbitrum Stylus.
 
-## 📁 Project Structure
+## Features
 
-```
-my-dapp/
-├── apps/
-│   └── web/                    # Next.js frontend
-│       ├── src/
-│       ├── package.json
-│       └── ...
-├── contracts/                  # Rust/Stylus smart contracts
-│   └── (contract source)
-├── docs/                       # Documentation
-├── scripts/                     # Deploy scripts
-├── .gitignore
-└── README.md
+- **Ownable** - Owner-controlled contract management
+- **Mintable** - Owner can mint new tokens
+- **Burnable** - Token holders can burn their tokens
+- **Pausable** - Owner can pause/unpause transfers
+- Complete ERC-20 standard implementation
+- React hooks for easy frontend integration
+
+## Installation
+
+```bash
+pnpm add @cradle/erc20-stylus
 ```
 
-## 🚀 Quick Start
+## Smart Contract
+
+The smart contract source code is located in the `contract/` directory. This is a Rust-based Stylus contract that can be deployed to Arbitrum.
 
 ### Prerequisites
-- Node.js 18+
-- npm, yarn, or pnpm
 
-### Installation
-
-1. **Clone the repository:**
+1. Install Rust and Cargo:
    ```bash
-   git clone <your-repo-url>
-   cd my-dapp
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
    ```
 
-2. **Install dependencies:**
+2. Install cargo-stylus:
    ```bash
-   npm install
-   # or
-   pnpm install
+   cargo install cargo-stylus
    ```
 
-3. **Set up environment variables:**
+3. Add the WASM target:
    ```bash
-   cp .env.example .env
+   rustup target add wasm32-unknown-unknown
    ```
 
-   Edit `.env` and configure:
-      - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`: WalletConnect Cloud project ID
-   - `NEXT_PUBLIC_OSTIUM_NETWORK`: Network for Ostium trading (arbitrum or arbitrum-sepolia)
-   - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`: WalletConnect Cloud project ID for wallet connections
+### Building the Contract
 
-4. **Deploy contracts** (from repo root): `pnpm deploy:sepolia` or `pnpm deploy:mainnet`
+```bash
+cd contract
 
-5. **Scripts (Windows):** Run `pnpm fix-scripts` or `dos2unix scripts/*.sh` if you see line-ending errors.
+# Check the contract compiles correctly
+cargo stylus check
 
-## 🔗 Smart Contracts
+# Build for deployment
+cargo build --release --target wasm32-unknown-unknown
+```
 
-The `contracts/` folder contains Rust/Stylus smart contract source code. See `docs/` for deployment and integration guides.
+### Deploying to Arbitrum
 
-## 🛠 Available Scripts
+#### Arbitrum Sepolia (Testnet)
 
-| Command | Description |
-|---------|-------------|
-| `pnpm deploy:sepolia` | Deploy to Arbitrum Sepolia |
-| `pnpm deploy:mainnet` | Deploy to Arbitrum One |
-| `pnpm fix-scripts` | Fix CRLF line endings (Windows) |
+```bash
+cd contract
+cargo stylus deploy \
+  --private-key <YOUR_PRIVATE_KEY> \
+  --endpoint https://sepolia-rollup.arbitrum.io/rpc
+```
 
-## 🌐 Supported Networks
+#### Arbitrum One (Mainnet)
 
-- Arbitrum Sepolia (Testnet)
-- Arbitrum One (Mainnet)
-- Superposition
-- Superposition Testnet
+```bash
+cd contract
+cargo stylus deploy \
+  --private-key <YOUR_PRIVATE_KEY> \
+  --endpoint https://arb1.arbitrum.io/rpc
+```
 
-## 📚 Tech Stack
+### Initializing the Contract
 
-- **Framework:** Next.js 14 (App Router)
-- **Styling:** Tailwind CSS
-- **Web3:** wagmi + viem
-- **Wallet Connection:** RainbowKit
+After deployment, call the `initialize` function with your token parameters:
 
-## 📖 Documentation
+```rust
+// Function signature:
+initialize(
+    name: String,        // Token name (e.g., "My Token")
+    symbol: String,      // Token symbol (e.g., "MTK")
+    decimals: u8,        // Decimal places (typically 18)
+    initial_supply: U256,// Initial supply (in smallest units)
+    owner: Address       // Owner address
+)
+```
 
-See the `docs/` folder for:
-- Contract interaction guide
-- Deployment instructions
-- API reference
+### Contract Functions
+
+#### ERC-20 Standard
+- `name()` - Returns the token name
+- `symbol()` - Returns the token symbol
+- `decimals()` - Returns the number of decimals
+- `total_supply()` - Returns the total token supply
+- `balance_of(account)` - Returns the balance of an account
+- `transfer(to, value)` - Transfer tokens
+- `approve(spender, value)` - Approve a spender
+- `allowance(owner, spender)` - Get allowance
+- `transfer_from(from, to, value)` - Transfer using allowance
+
+#### Extended Functions
+- `increase_allowance(spender, added_value)` - Increase allowance
+- `decrease_allowance(spender, subtracted_value)` - Decrease allowance
+
+#### Mintable (Owner Only)
+- `mint(to, amount)` - Mint new tokens
+
+#### Burnable
+- `burn(amount)` - Burn caller's tokens
+- `burn_from(from, amount)` - Burn tokens using allowance
+
+#### Pausable (Owner Only)
+- `pause()` - Pause transfers
+- `unpause()` - Unpause transfers
+- `is_paused()` - Check if paused
+
+#### Ownable
+- `owner()` - Get current owner
+- `transfer_ownership(new_owner)` - Transfer ownership
+- `renounce_ownership()` - Renounce ownership
+
+## Frontend Usage
+
+### Using React Hooks
+
+```tsx
+import { useERC20Interactions, CHAIN_IDS } from '@cradle/erc20-stylus';
+
+function TokenDashboard() {
+  const token = useERC20Interactions({
+    contractAddress: '0x...', // Your deployed contract address
+    rpcEndpoint: 'https://sepolia-rollup.arbitrum.io/rpc',
+    privateKey: process.env.PRIVATE_KEY,
+  });
+
+  return (
+    <div>
+      <p>Name: {token.name}</p>
+      <p>Symbol: {token.symbol}</p>
+      <p>Total Supply: {token.totalSupply}</p>
+      <button onClick={() => token.transfer('0x...', '100')}>
+        Transfer 100 tokens
+      </button>
+    </div>
+  );
+}
+```
+
+### Using Interaction Functions Directly
+
+```tsx
+import { getTokenInfo, transfer, mint } from '@cradle/erc20-stylus';
+
+// Get token information
+const info = await getTokenInfo({
+  contractAddress: '0x...',
+  rpcEndpoint: 'https://sepolia-rollup.arbitrum.io/rpc',
+});
+
+console.log(info.name, info.symbol, info.totalSupply);
+
+// Transfer tokens
+await transfer({
+  contractAddress: '0x...',
+  rpcEndpoint: 'https://sepolia-rollup.arbitrum.io/rpc',
+  privateKey: '0x...',
+  to: '0x...',
+  amount: '1000000000000000000', // 1 token (with 18 decimals)
+});
+```
+
+## API Reference
+
+### Constants
+
+- `ERC20_ABI` - Full ABI for ERC20 Stylus contract
+- `CHAIN_IDS` - Chain IDs for supported networks
+- `RPC_ENDPOINTS` - Default RPC endpoints
+- `FACTORY_ADDRESSES` - Factory contract addresses
+
+### Hooks
+
+- `useERC20Deploy` - Hook for deploying new ERC20 tokens
+- `useERC20Interactions` - Hook for interacting with deployed tokens
+
+### Functions
+
+- `deployERC20TokenViaAPI` - Deploy a new ERC20 token via API
+- `initializeToken` - Initialize a deployed token
+- `getTokenInfo` - Get token information
+- `getBalance` - Get token balance
+- `getAllowance` - Get allowance
+- `transfer` - Transfer tokens
+- `approve` - Approve spender
+- `transferFrom` - Transfer using allowance
+- `mint` - Mint new tokens (owner only)
+- `burn` - Burn tokens
+- `pause` - Pause transfers (owner only)
+- `unpause` - Unpause transfers (owner only)
+- `transferOwnership` - Transfer contract ownership
 
 ## License
 
-MIT
-
----
-
-Generated with ❤️ by [Cradle](https://cradle.dev)
+MIT OR Apache-2.0
